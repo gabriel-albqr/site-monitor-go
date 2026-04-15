@@ -3,17 +3,22 @@ package monitor
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"time"
 
 	"site-monitor-go/internal/domain"
 )
 
+// CycleReporter define a saída do runner sem acoplar a lógica de monitoramento ao terminal.
+type CycleReporter interface {
+	PrintCycleStart(cycle int, timestamp time.Time, interval time.Duration)
+	PrintCycleResults(results []domain.CheckResult)
+}
+
 // Runner orquestra ciclos contínuos de monitoramento.
 type Runner struct {
 	service  *Service
 	interval time.Duration
+	reporter CycleReporter
 }
 
 // NewRunner cria um runner com intervalo entre ciclos.
@@ -22,6 +27,11 @@ func NewRunner(service *Service, interval time.Duration) *Runner {
 		service:  service,
 		interval: interval,
 	}
+}
+
+// SetReporter define o reporter de saída do runner.
+func (r *Runner) SetReporter(reporter CycleReporter) {
+	r.reporter = reporter
 }
 
 // Run executa o monitoramento em ciclos contínuos até o contexto ser cancelado.
@@ -35,13 +45,18 @@ func (r *Runner) Run(ctx context.Context, sites []domain.Site) error {
 	if len(sites) == 0 {
 		return errors.New("runner inválido: lista de sites está vazia")
 	}
+	if r.reporter == nil {
+		return errors.New("runner inválido: reporter não pode ser nil")
+	}
 
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
 
 	cycle := 1
 	for {
-		runCycle(cycle, time.Now().UTC(), r.interval, r.service.CheckSites(sites))
+		timestamp := time.Now().UTC()
+		r.reporter.PrintCycleStart(cycle, timestamp, r.interval)
+		r.reporter.PrintCycleResults(r.service.CheckSites(sites))
 		cycle++
 
 		select {
@@ -50,16 +65,4 @@ func (r *Runner) Run(ctx context.Context, sites []domain.Site) error {
 		case <-ticker.C:
 		}
 	}
-}
-
-func runCycle(cycle int, timestamp time.Time, interval time.Duration, results []domain.CheckResult) {
-	printCycleHeader(cycle, timestamp, interval)
-	PrintResults(results)
-}
-
-func printCycleHeader(cycle int, timestamp time.Time, interval time.Duration) {
-	fmt.Println()
-	fmt.Println(strings.Repeat("=", 60))
-	fmt.Printf("Ciclo %d | %s | proximo em %s\n", cycle, timestamp.Format(time.RFC3339), interval)
-	fmt.Println(strings.Repeat("=", 60))
 }
