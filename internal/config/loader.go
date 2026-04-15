@@ -6,17 +6,13 @@ import (
 	"fmt"
 	"os"
 	"strings"
-)
 
-// Site representa um site configurado para ser monitorado
-type Site struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
-}
+	"site-monitor-go/internal/domain"
+)
 
 // SitesConfig representa o conteúdo de configuração do arquivo JSON.
 type SitesConfig struct {
-	Sites []Site `json:"sites"`
+	Sites []domain.Site `json:"sites"`
 }
 
 // LoadSitesConfig carrega e valida o arquivo de configuração de sites.
