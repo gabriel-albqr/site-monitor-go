@@ -13,6 +13,9 @@ build/*.exe
 *.out
 coverage.out
 
+# Runtime monitoring data
+data/*.jsonl
+
 # Go workspace file
 go.work
 

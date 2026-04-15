@@ -12,10 +12,12 @@ import (
 	"site-monitor-go/internal/config"
 	"site-monitor-go/internal/monitor"
 	"site-monitor-go/internal/output"
+	"site-monitor-go/internal/persistence"
 )
 
 func main() {
 	const configPath = "configs/sites.json"
+	const resultsFilePath = "data/results.jsonl"
 
 	cfg, err := config.LoadSitesConfig(configPath)
 	if err != nil {
@@ -33,6 +35,13 @@ func main() {
 	service := monitor.NewService(requestTimeout)
 	runner := monitor.NewRunner(service, cfg.CheckInterval())
 	runner.SetReporter(console)
+
+	store, err := persistence.NewJSONLStore(resultsFilePath)
+	if err != nil {
+		log.Fatalf("erro ao inicializar persistência: %v", err)
+	}
+	runner.SetResultStore(store)
+
 	if err := runner.Run(ctx, cfg.Sites); err != nil && !errors.Is(err, context.Canceled) {
 		log.Fatalf("erro no monitoramento contínuo: %v", err)
 	}

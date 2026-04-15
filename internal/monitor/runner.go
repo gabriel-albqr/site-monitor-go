@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"site-monitor-go/internal/domain"
@@ -14,11 +15,17 @@ type CycleReporter interface {
 	PrintCycleResults(results []domain.CheckResult)
 }
 
+// CycleResultStore define a persistência dos resultados sem acoplamento ao runner.
+type CycleResultStore interface {
+	SaveCycle(cycle int, timestamp time.Time, results []domain.CheckResult) error
+}
+
 // Runner orquestra ciclos contínuos de monitoramento.
 type Runner struct {
 	service  *Service
 	interval time.Duration
 	reporter CycleReporter
+	store    CycleResultStore
 }
 
 // NewRunner cria um runner com intervalo entre ciclos.
@@ -32,6 +39,11 @@ func NewRunner(service *Service, interval time.Duration) *Runner {
 // SetReporter define o reporter de saída do runner.
 func (r *Runner) SetReporter(reporter CycleReporter) {
 	r.reporter = reporter
+}
+
+// SetResultStore define o destino de persistência dos resultados.
+func (r *Runner) SetResultStore(store CycleResultStore) {
+	r.store = store
 }
 
 // Run executa o monitoramento em ciclos contínuos até o contexto ser cancelado.
@@ -55,8 +67,17 @@ func (r *Runner) Run(ctx context.Context, sites []domain.Site) error {
 	cycle := 1
 	for {
 		timestamp := time.Now().UTC()
+		results := r.service.CheckSites(sites)
+
 		r.reporter.PrintCycleStart(cycle, timestamp, r.interval)
-		r.reporter.PrintCycleResults(r.service.CheckSites(sites))
+		r.reporter.PrintCycleResults(results)
+
+		if r.store != nil {
+			if err := r.store.SaveCycle(cycle, timestamp, results); err != nil {
+				return fmt.Errorf("falha ao persistir resultados do ciclo %d: %w", cycle, err)
+			}
+		}
+
 		cycle++
 
 		select {
