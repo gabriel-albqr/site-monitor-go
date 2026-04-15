@@ -1,4 +1,5 @@
 {
+  "check_interval_seconds": 15,
   "sites": [
     {
       "name": "Google",

@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"site-monitor-go/internal/config"
@@ -24,7 +29,14 @@ func main() {
 		fmt.Printf("  %d. %s -> %s\n", i+1, site.Name, site.URL)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	service := monitor.NewService(5 * time.Second)
-	results := service.CheckSites(cfg.Sites)
-	monitor.PrintResults(results)
+	runner := monitor.NewRunner(service, cfg.CheckInterval())
+	if err := runner.Run(ctx, cfg.Sites); err != nil && !errors.Is(err, context.Canceled) {
+		log.Fatalf("erro no monitoramento contínuo: %v", err)
+	}
+
+	fmt.Println("Encerrando monitoramento")
 }

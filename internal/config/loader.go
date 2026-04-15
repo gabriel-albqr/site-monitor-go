@@ -6,13 +6,20 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"site-monitor-go/internal/domain"
 )
 
 // SitesConfig representa o conteúdo de configuração do arquivo JSON.
 type SitesConfig struct {
-	Sites []domain.Site `json:"sites"`
+	CheckIntervalSeconds int           `json:"check_interval_seconds"`
+	Sites                []domain.Site `json:"sites"`
+}
+
+// CheckInterval retorna o intervalo configurado para o ciclo de monitoramento.
+func (c SitesConfig) CheckInterval() time.Duration {
+	return time.Duration(c.CheckIntervalSeconds) * time.Second
 }
 
 // LoadSitesConfig carrega e valida o arquivo de configuração de sites.
@@ -39,6 +46,10 @@ func LoadSitesConfig(path string) (SitesConfig, error) {
 }
 
 func validateSitesConfig(cfg SitesConfig) error {
+	if cfg.CheckIntervalSeconds <= 0 {
+		return errors.New("configuração inválida: check_interval_seconds deve ser maior que zero")
+	}
+
 	if len(cfg.Sites) == 0 {
 		return errors.New("configuração inválida: lista de sites está vazia")
 	}
