@@ -16,7 +16,8 @@ const defaultRequestTimeout = 5 * time.Second
 
 // Checker executa checagens HTTP individuais de forma isolada.
 type Checker struct {
-	client *http.Client
+	client         *http.Client
+	defaultTimeout time.Duration
 }
 
 // NewChecker cria um checker com timeout configurado.
@@ -26,7 +27,8 @@ func NewChecker(timeout time.Duration) *Checker {
 	}
 
 	return &Checker{
-		client: &http.Client{Timeout: timeout},
+		client:         &http.Client{},
+		defaultTimeout: timeout,
 	}
 }
 
@@ -41,10 +43,27 @@ func (c *Checker) Check(site domain.Site) domain.CheckResult {
 		CheckedAt: checkedAt,
 	}
 
-	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, site.URL, nil)
+	effectiveTimeout := c.defaultTimeout
+	if site.TimeoutSeconds > 0 {
+		effectiveTimeout = time.Duration(site.TimeoutSeconds) * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), effectiveTimeout)
+	defer cancel()
+
+	method := site.Method
+	if method == "" {
+		method = http.MethodGet
+	}
+
+	request, err := http.NewRequestWithContext(ctx, method, site.URL, nil)
 	if err != nil {
 		result.ErrorMessage = fmt.Sprintf("erro ao criar request: %v", err)
 		return result
+	}
+
+	for key, value := range site.Headers {
+		request.Header.Set(key, value)
 	}
 
 	response, err := c.client.Do(request)
